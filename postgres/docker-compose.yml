@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  database:
+    image: postgres
+    env_file:
+      - .env
+
+  migration:
+    image: webdevops/liquibase:postgres
+    env_file:
+      - .env
+    volumes:
+      - .:${PATH_TO_LOG_FILE}
+    command: liquibase update

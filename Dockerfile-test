@@ -1,0 +1,3 @@
+FROM openjdk:jdk-10-slim
+COPY . .
+RUN gradlew clean test

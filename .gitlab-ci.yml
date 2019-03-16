@@ -1,0 +1,70 @@
+image: docker:latest
+
+services:
+  - docker:dind
+
+before_script:
+  - docker info
+  - docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD} ${DOCKER_SERVER}
+
+after_script:
+  - docker ps -a
+  - docker images
+
+stages:
+  - test
+  - build
+
+variables: &base_variables
+  PGDATA: /var/lib/postgresql/data
+  POSTGRES_USER: bill
+  POSTGRES_PASSWORD: bill
+  POSTGRES_DB: tariffdb
+  PATH_TO_LOG_FILE: /var
+
+test:
+  stage: test
+  script: [gradlew clean test]
+  tags:
+    - java
+
+build_data_base:
+  stage: build
+  variables:
+    <<: *base_variables
+    IMAGE_NAME: $MY_REPOSITORY/db-tariff:latest
+    BUILD_TARGET: db-tariff
+    BUILD_CONTEXT: ./postgres
+  script:
+    - docker build \
+          --pull \
+          -t $IMAGE_NAME \
+          --target=$BUILD_TARGET \
+          --build-arg PGDATA=${PGDATA} \
+          --build-arg POSTGRES_USER=${POSTGRES_USER} \
+          --build-arg POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+          --build-arg POSTGRES_DB=${POSTGRES_DB} \
+          --build-arg PATH_TO_LOG_FILE=${PATH_TO_LOG_FILE} \
+            $BUILD_CONTEXT
+    - docker push $IMAGE_NAME
+
+build_tariff_app:
+  stage: build
+  variables:
+    <<: *base_variables
+    IMAGE_NAME: $MY_REPOSITORY/app-tariff:latest
+    BUILD_TARGET: app-tariff
+    BUILD_CONTEXT: .
+  script:
+    - docker build \
+          --pull \
+          -t $IMAGE_NAME \
+          --target=$BUILD_TARGET \
+          --build-arg PGDATA=${PGDATA} \
+          --build-arg POSTGRES_USER=${POSTGRES_USER} \
+          --build-arg POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+          --build-arg POSTGRES_DB=${POSTGRES_DB} \
+            $BUILD_CONTEXT
+    - docker push $IMAGE_NAME
+  dependencies:
+    - test
